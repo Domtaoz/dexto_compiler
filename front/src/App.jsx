@@ -42,6 +42,8 @@ const App = () => {
 
   const handleSave = async () => {
     try {
+      console.log("Sending save request...");
+  
       const response = await fetch("http://localhost:5000/save", {
         method: "POST",
         headers: {
@@ -52,9 +54,17 @@ const App = () => {
           content: fileContent,
         }),
       });
+  
+      console.log("Response received:", response);
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
       const result = await response.json();
       alert(result.message);
     } catch (error) {
+      console.error("Save error:", error);
       alert("Error: " + error.message);
     }
   };

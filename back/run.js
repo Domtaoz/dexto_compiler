@@ -31,7 +31,7 @@ app.post("/compile", (req, res) => {
   } else if (extension === "cpp") {
     tempFilePath = path.join(__dirname, "tempCode.cpp");
     fs.writeFileSync(tempFilePath, code);
-    command = `g++ ${tempFilePath} -o tempCode && ./tempCode`;
+    command = `g++ ${tempFilePath} -o tempCode.exe && echo ${input} | tempCode.exe`;
   } else if (extension === "java") {
     tempFilePath = path.join(__dirname, "TempCode.java");
     fs.writeFileSync(tempFilePath, code);
@@ -53,15 +53,25 @@ app.post("/compile", (req, res) => {
 });
 
 app.post("/save", (req, res) => {
-  const { filename, content } = req.body;
-  if (!filename || !content) {
-    return res.status(400).json({ error: "Filename and content required" });
-  }
+  try {
+    const { filename, content } = req.body;
+    if (!filename || !content) {
+      return res.status(400).json({ error: "Filename and content required" });
+    }
 
-  const filePath = path.join(__dirname, filename);
-  fs.writeFileSync(filePath, content);
-  res.json({ message: "📂 ไฟล์ถูกบันทึกเรียบร้อย!" });
+    const filePath = path.join(__dirname, filename); // ตรวจสอบ path ที่บันทึก
+    console.log("Saving to:", filePath);
+
+    fs.writeFileSync(filePath, content, "utf8");
+
+    res.json({ message: "📂 ไฟล์ถูกบันทึกเรียบร้อย!" });
+  } catch (error) {
+    console.error("Save Error:", error);
+    res.status(500).json({ error: "เกิดข้อผิดพลาดในการบันทึกไฟล์" });
+  }
+  console.log("Saving content:", fileContent);
 });
+
 
 app.get("/download", (req, res) => {
   const { filename } = req.query;
@@ -80,3 +90,4 @@ app.get("/download", (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
+
