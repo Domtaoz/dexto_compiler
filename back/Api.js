@@ -1,43 +1,43 @@
 const express = require("express");
 const app = express();
 const compiler = require("compilex");
-const fs = require("fs");
-const path = require("path");
-const multer = require("multer");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const upload = multer({ dest: 'uploads/' });
+
 const options = { stats: true };
 compiler.init(options);
 
-// ตั้งค่า multer สำหรับการอัปโหลดไฟล์
-const upload = multer({ dest: 'uploads/' });
-
+// ใช้ express.json() แทน body-parser
 app.use(express.json());
+app.use(express.static(__dirname + "/public"));  // เสิร์ฟไฟล์ HTML
 
 app.get("/", function (req, res) {
-    console.log(__dirname); // เพิ่มคำสั่งนี้เพื่อดูตำแหน่ง
-    res.sendFile(__dirname + "/index.html");
+    compiler.flush(function () {
+        console.log("deleted");
+    });
+    res.sendFile(__dirname + "/index.html");  // เสิร์ฟไฟล์ index.html
 });
 
 
-// API สำหรับการอัปโหลดไฟล์
-app.post("/upload", upload.single("file"), function (req, res) {
+// Route สำหรับการอัปโหลดไฟล์
+app.post('/upload', upload.single('file'), function (req, res) {
     if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+        return res.status(400).json({ output: "No file uploaded" });
     }
 
-    // สร้างไฟล์ใหม่จากไฟล์ที่อัปโหลด
-    const uploadedFilePath = path.join(__dirname, "uploads", req.file.filename);
-    fs.readFile(uploadedFilePath, "utf8", function (err, data) {
+    const uploadedFilePath = path.join(__dirname, 'uploads', req.file.filename);
+    fs.rename(req.file.path, uploadedFilePath, function (err) {
         if (err) {
-            return res.status(500).json({ message: "Error reading the file" });
+            return res.status(500).json({ output: "Error while saving file" });
         }
-        res.json({ content: data });
+        res.json({ output: "File uploaded successfully", filePath: uploadedFilePath });
     });
 });
 
 // API สำหรับการคอมไพล์โค้ด
 app.post("/compile", function (req, res) {
-    console.log("Received request:", req.body);
-
     let { code, input, lang } = req.body;
 
     if (!code || !lang) {
@@ -49,21 +49,14 @@ app.post("/compile", function (req, res) {
 
         if (lang === "Cpp") {
             envData.cmd = "g++";
-            if (!input) {
-                compiler.compileCPP(envData, code, function (data) {
-                    res.json(data);
-                });
-            } else {
-                compiler.compileCPPWithInput(envData, code, input, function (data) {
-                    res.json(data);
-                });
-            }
-        }
-        else if (lang === "Java") {
-            const javaFilePath = './temp/JavaProgram/Main.java';
+            compiler.compileCPP(envData, code, function (data) {
+                res.json(data);
+            });
+        } else if (lang === "Java") {
+            let javaFilePath = './temp/JavaProgram/Main.java';
             fs.writeFileSync(javaFilePath, code);
-
             const exec = require('child_process').exec;
+
             exec(`javac ${javaFilePath}`, (err, stdout, stderr) => {
                 if (err || stderr) {
                     return res.status(500).json({ output: stderr || "Error: Compilation failed" });
@@ -76,19 +69,11 @@ app.post("/compile", function (req, res) {
                     res.json({ output: stdout });
                 });
             });
-        }
-        else if (lang === "Python") {
-            if (!input) {
-                compiler.compilePython(envData, code, function (data) {
-                    res.json(data);
-                });
-            } else {
-                compiler.compilePythonWithInput(envData, code, input, function (data) {
-                    res.json(data);
-                });
-            }
-        }
-        else {
+        } else if (lang === "Python") {
+            compiler.compilePythonWithInput(envData, code, input, function (data) {
+                res.json(data);
+            });
+        } else {
             res.status(400).json({ output: "Error: Unsupported language" });
         }
     } catch (e) {
