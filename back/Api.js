@@ -47,15 +47,30 @@ app.post("/compile", function (req, res) {
         }
         // สำหรับ Java
         else if (lang === "Java") {
-            if (!input) {
-                compiler.compileJava(envData, code, function (data) {
-                    res.json(data);
+            let javaFilePath = './temp/JavaProgram/Main.java';
+            const fs = require("fs");
+            fs.mkdirSync('./temp/JavaProgram', { recursive: true }); // สร้างโฟลเดอร์หากยังไม่มี
+
+            fs.writeFileSync(javaFilePath, code);
+
+            const exec = require('child_process').exec;
+
+            // คอมไพล์ไฟล์ Java ด้วย javac
+            exec(`javac ${javaFilePath}`, (err, stdout, stderr) => {
+                if (err || stderr) {
+                    console.error("Error during Java compilation:", stderr || err);
+                    return res.status(500).json({ output: stderr || "Error: Compilation failed" });
+                }
+
+                // รันไฟล์ที่คอมไพล์แล้ว
+                exec(`java -cp ./temp/JavaProgram Main`, (err, stdout, stderr) => {
+                    if (err || stderr) {
+                        console.error("Error during Java execution:", stderr || err);
+                        return res.status(500).json({ output: stderr || "Error: Execution failed" });
+                    }
+                    res.json({ output: stdout });
                 });
-            } else {
-                compiler.compileJavaWithInput(envData, code, input, function (data) {
-                    res.json(data);
-                });
-            }
+            });
         }
         // สำหรับ Python
         else if (lang === "Python") {
