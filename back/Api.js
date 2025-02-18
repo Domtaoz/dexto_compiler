@@ -18,32 +18,42 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
 });
 
-// ดึงไฟล์จากเครื่องมาแก้ไข
-app.post("/load-file", upload.single("file"), (req, res) => {
-    if (!req.file) return res.status(400).json({ output: "No file uploaded" });
-
-    const filePath = path.join(__dirname, req.file.path);
-    fs.readFile(filePath, "utf8", (err, data) => {
-        if (err) return res.status(500).json({ output: "Error reading file" });
-
-        res.json({ filename: req.file.originalname, content: data });
+// อัปโหลดไฟล์
+app.post("/upload", upload.single("file"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ output: "No file uploaded" });
+    }
+    const uploadedFilePath = path.join(__dirname, "uploads", req.file.originalname);
+    fs.rename(req.file.path, uploadedFilePath, (err) => {
+        if (err) {
+            return res.status(500).json({ output: "Error while saving file" });
+        }
+        fs.readFile(uploadedFilePath, "utf8", (err, data) => {
+            if (err) {
+                return res.status(500).json({ output: "Error reading file" });
+            }
+            res.json({ output: "File uploaded successfully", filePath: uploadedFilePath, content: data });
+        });
     });
 });
 
-// บันทึกไฟล์ลงเครื่อง
+// บันทึกโค้ด
 app.post("/save", (req, res) => {
-    const { filename, code } = req.body;
-    if (!filename || !code) return res.status(400).json({ output: "Missing filename or code" });
-
+    const { filename, code, isExisting } = req.body;
+    if (!filename || !code) {
+        return res.status(400).json({ output: "Missing filename or code" });
+    }
     const filePath = path.join(__dirname, "uploads", filename);
     fs.writeFileSync(filePath, code);
-    res.json({ output: "File saved successfully", filePath });
+    res.json({ output: isExisting ? "File updated successfully" : "File saved successfully", filePath });
 });
 
 // คอมไพล์โค้ด
 app.post("/compile", (req, res) => {
     let { code, input, lang } = req.body;
-    if (!code || !lang) return res.status(400).json({ output: "Missing code or language" });
+    if (!code || !lang) {
+        return res.status(400).json({ output: "Missing code or language" });
+    }
 
     try {
         let envData = { OS: "windows", options: { timeout: 10000 } };
@@ -51,13 +61,10 @@ app.post("/compile", (req, res) => {
         if (lang === "Cpp") {
             envData.cmd = "g++";
             compiler.compileCPPWithInput(envData, code, input, (data) => res.json(data));
-
         } else if (lang === "Python") {
             compiler.compilePythonWithInput(envData, code, input, (data) => res.json(data));
-
         } else if (lang === "Java") {
             compiler.compileJavaWithInput(envData, code, input, (data) => res.json(data));
-
         } else {
             res.status(400).json({ output: "Unsupported language" });
         }
