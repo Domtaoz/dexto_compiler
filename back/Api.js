@@ -9,25 +9,22 @@ const upload = multer({ dest: 'uploads/' });
 const options = { stats: true };
 compiler.init(options);
 
-// ใช้ express.json() แทน body-parser
 app.use(express.json());
-app.use(express.static(__dirname + "/public"));  // เสิร์ฟไฟล์ HTML
+app.use(express.static(__dirname + "/public"));
 
 app.get("/", function (req, res) {
     compiler.flush(function () {
         console.log("deleted");
     });
-    res.sendFile(__dirname + "/index.html");  // เสิร์ฟไฟล์ index.html
+    res.sendFile(__dirname + "/index.html");
 });
 
-
-// Route สำหรับการอัปโหลดไฟล์
 app.post('/upload', upload.single('file'), function (req, res) {
     if (!req.file) {
         return res.status(400).json({ output: "No file uploaded" });
     }
 
-    const uploadedFilePath = path.join(__dirname, 'uploads', req.file.filename);
+    const uploadedFilePath = path.join(__dirname, 'uploads', req.file.originalname);
     fs.rename(req.file.path, uploadedFilePath, function (err) {
         if (err) {
             return res.status(500).json({ output: "Error while saving file" });
@@ -36,50 +33,38 @@ app.post('/upload', upload.single('file'), function (req, res) {
     });
 });
 
-// API สำหรับการคอมไพล์โค้ด
+app.post("/save", function (req, res) {
+    const { filename, code } = req.body;
+    if (!filename || !code) {
+        return res.status(400).json({ output: "Missing filename or code" });
+    }
+    const filePath = path.join(__dirname, 'uploads', filename);
+    fs.writeFileSync(filePath, code);
+    res.json({ output: "File saved successfully", filePath });
+});
+
 app.post("/compile", function (req, res) {
     let { code, input, lang } = req.body;
-
     if (!code || !lang) {
-        return res.status(400).json({ output: "Error: Missing code or language" });
+        return res.status(400).json({ output: "Missing code or language" });
     }
-
     try {
         let envData = { OS: "windows", options: { timeout: 10000 } };
-
         if (lang === "Cpp") {
             envData.cmd = "g++";
             compiler.compileCPP(envData, code, function (data) {
                 res.json(data);
-            });
-        } else if (lang === "Java") {
-            let javaFilePath = './temp/JavaProgram/Main.java';
-            fs.writeFileSync(javaFilePath, code);
-            const exec = require('child_process').exec;
-
-            exec(`javac ${javaFilePath}`, (err, stdout, stderr) => {
-                if (err || stderr) {
-                    return res.status(500).json({ output: stderr || "Error: Compilation failed" });
-                }
-
-                exec(`java -cp ./temp/JavaProgram Main ${input}`, (err, stdout, stderr) => {
-                    if (err || stderr) {
-                        return res.status(500).json({ output: stderr || "Error: Execution failed" });
-                    }
-                    res.json({ output: stdout });
-                });
             });
         } else if (lang === "Python") {
             compiler.compilePythonWithInput(envData, code, input, function (data) {
                 res.json(data);
             });
         } else {
-            res.status(400).json({ output: "Error: Unsupported language" });
+            res.status(400).json({ output: "Unsupported language" });
         }
     } catch (e) {
-        res.status(500).json({ output: "Error: Internal server error" });
+        res.status(500).json({ output: "Internal server error" });
     }
 });
 
-// เริ่มเซิร์ฟเวอร์
 app.listen(8000, () => console.log("Server running on http://localhost:8000"));

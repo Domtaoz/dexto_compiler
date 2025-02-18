@@ -1,13 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Online Code Compiler</title>
-
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/codemirror.min.css">
@@ -16,45 +12,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/mode/python/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/addon/edit/closebrackets.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/theme/dracula.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
 </head>
-
 <body>
     <div class="container mt-3">
         <div class="d-flex justify-content-between bg-dark rounded p-3">
-            <div>
-                <select class="form-select" id="languageSelector">
-                    <option selected>Choose Language...</option>
-                    <option value="Java">Java</option>
-                    <option value="Cpp">C++</option>
-                    <option value="Python">Python</option>
-                </select>
-            </div>
-            <div>
-                <!-- ปุ่มเลือกไฟล์ -->
-                <input type="file" id="fileInput" class="form-control" />
-            </div>
-            <div>
-                <button type="button" id="run" class="btn btn-success"><i class="bi bi-play-fill"></i> Run</button>
-                <button type="button" id="clear" class="btn btn-danger"><i class="bi bi-x-circle"></i> Clear</button>
-                <!-- ปุ่มบันทึกไฟล์ -->
-                <button type="button" id="save" class="btn btn-primary">Save</button>
-            </div>
+            <select class="form-select" id="languageSelector">
+                <option selected>Choose Language...</option>
+                <option value="Java">Java</option>
+                <option value="Cpp">C++</option>
+                <option value="Python">Python</option>
+            </select>
+            <input type="file" id="fileInput" class="form-control" />
+            <button type="button" id="run" class="btn btn-success">Run</button>
+            <button type="button" id="save" class="btn btn-primary">Save</button>
         </div>
-
-        <div class="row mt-3">
-            <div class="col-md-7">
-                <textarea id="editor"></textarea>
-            </div>
-            <div class="col-md-5">
-                <label class="text-light">Input:</label>
-                <textarea id="input" class="form-control" rows="5"></textarea>
-                <label class="text-light mt-3">Output:</label>
-                <textarea id="output" class="form-control" rows="5" readonly></textarea>
-            </div>
-        </div>
+        <textarea id="editor"></textarea>
+        <label>Input & Output:</label>
+        <textarea id="inputOutput" class="form-control" rows="5"></textarea>
     </div>
-
     <script>
         var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
             mode: "text/x-c++src",
@@ -63,20 +38,13 @@
             autoCloseBrackets: true
         });
 
-        var languageSelector = document.getElementById("languageSelector");
-        languageSelector.addEventListener("change", function () {
-            if (languageSelector.value === "Java") {
-                editor.setOption("mode", "text/x-java");
-            } else if (languageSelector.value === "Python") {
-                editor.setOption("mode", "text/x-python");
-            } else {
-                editor.setOption("mode", "text/x-c++src");
-            }
+        document.getElementById("languageSelector").addEventListener("change", function () {
+            let lang = this.value;
+            editor.setOption("mode", lang === "Java" ? "text/x-java" : lang === "Python" ? "text/x-python" : "text/x-c++src");
         });
 
-        // โหลดไฟล์ที่ผู้ใช้เลือก
         document.getElementById("fileInput").addEventListener("change", function (event) {
-            const file = event.target.files[0];  // เลือกไฟล์ที่ผู้ใช้เลือก
+            const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function (e) {
@@ -86,47 +54,38 @@
             }
         });
 
-        // บันทึกไฟล์ที่แก้ไข
         document.getElementById("save").addEventListener("click", function () {
-            const blob = new Blob([editor.getValue()], { type: "text/plain" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "edited_file.txt";  // กำหนดชื่อไฟล์ที่ต้องการบันทึก
-            link.click();
+            const filename = prompt("Enter filename to save:");
+            if (!filename) return;
+            fetch("/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filename, code: editor.getValue() })
+            }).then(res => res.json()).then(data => alert(data.output));
         });
 
-        // ฟังก์ชันรันโค้ด
         document.getElementById("run").addEventListener("click", async function () {
             let codeData = {
                 code: editor.getValue(),
-                input: document.getElementById("input").value,
-                lang: languageSelector.value
+                input: document.getElementById("inputOutput").value,
+                lang: document.getElementById("languageSelector").value
             };
-
             if (!codeData.lang || codeData.lang === "Choose Language...") {
-                alert("กรุณาเลือกภาษาก่อนรันโค้ด");
+                alert("Select a language before running");
                 return;
             }
-
             try {
-                let response = await fetch("http://localhost:8000/compile", {
+                let response = await fetch("/compile", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(codeData)
                 });
-
                 let result = await response.json();
-                document.getElementById("output").value = result.output || "Error: Compilation failed";
+                document.getElementById("inputOutput").value = result.output || "Error: Compilation failed";
             } catch (error) {
-                document.getElementById("output").value = "Server Error: Unable to connect";
+                document.getElementById("inputOutput").value = "Server Error: Unable to connect";
             }
-        });
-
-        // ฟังก์ชันล้างหน้าจอ
-        document.getElementById("clear").addEventListener("click", function () {
-            document.getElementById("output").value = "";
         });
     </script>
 </body>
-
 </html>
