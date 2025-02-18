@@ -69,15 +69,25 @@
         });
 
         document.getElementById("download").addEventListener("click", function () {
-            const filename = currentFile || "code.txt";
+            // ขอให้ผู้ใช้กรอกชื่อไฟล์
+            const filename = prompt("Enter filename to download:", currentFile || "code.txt");
+        
+            // ถ้าผู้ใช้กด "Cancel" หรือไม่ได้กรอกชื่อ, ให้ใช้ชื่อไฟล์เริ่มต้น
+            if (!filename) return;
+        
+            // สร้าง Blob จากเนื้อหาของ editor
             const blob = new Blob([editor.getValue()], { type: "text/plain" });
+        
+            // สร้างลิงก์ดาวน์โหลด
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = filename;
+            link.download = filename; // ใช้ชื่อไฟล์ที่ผู้ใช้กรอกหรือค่าดีฟอลต์
             document.body.appendChild(link);
-            link.click();
+            link.click(); // คลิกเพื่อดาวน์โหลด
             document.body.removeChild(link);
         });
+        
+        
 
         document.getElementById("run").addEventListener("click", async function () {
             let codeData = {

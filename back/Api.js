@@ -73,4 +73,24 @@ app.post("/compile", (req, res) => {
     }
 });
 
+// ดาวน์โหลดไฟล์
+app.get("/download/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, "uploads", filename);
+
+    // ตรวจสอบว่ามีไฟล์นั้นในเซิร์ฟเวอร์หรือไม่
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+        if (err) {
+            return res.status(404).json({ output: "File not found" });
+        }
+
+        // ส่งไฟล์ให้ผู้ใช้ดาวน์โหลด
+        res.download(filePath, filename, (err) => {
+            if (err) {
+                res.status(500).json({ output: "Error downloading file" });
+            }
+        });
+    });
+});
+
 app.listen(8000, () => console.log("Server running on http://localhost:8000"));
