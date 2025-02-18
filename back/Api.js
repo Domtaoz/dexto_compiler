@@ -60,9 +60,15 @@ app.post("/compile", (req, res) => {
         let envData = { OS: "windows", options: { timeout: 10000 } };
 
         if (lang === "Cpp") {
-            envData.cmd = "g++";  // สำหรับ C++
-            compiler.compileCPPWithInput(envData, code, input, (data) => res.json(data));
-        } else if (lang === "Python") {
+            envData.cmd = "g++";  // For C++
+            compiler.compileCPPWithInput(envData, code, input, (data) => {
+                if (data.error) {
+                    console.error("Compilation Error: ", data.error);
+                }
+                res.json(data);
+            });
+        }
+         else if (lang === "Python") {
             envData.cmd = "python";  // สำหรับ Python
             compiler.compilePythonWithInput(envData, code, input, (data) => res.json(data));
         } else if (lang === "Java") {
@@ -76,10 +82,10 @@ app.post("/compile", (req, res) => {
             const compileCmd = `javac ${filePath}`;
             const exec = require("child_process").exec;
 
-            exec(compileCmd, (err, stdout, stderr) => {
-                if (err) {
-                    return res.status(400).json({ output: "Compilation Error: " + stderr });
-                }
+            console.log("Compile Command:", compileCmd); // Debugging
+                exec(compileCmd, (err, stdout, stderr) => {
+                    console.log("Compile Error:", stderr);
+
 
                 // หลังจากคอมไพล์สำเร็จ ให้รันโปรแกรม Java
                 const runCmd = `java -cp ${__dirname}/uploads Main`;  // ใช้ classpath เพื่อรัน Main.class
