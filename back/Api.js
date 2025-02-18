@@ -49,6 +49,7 @@ app.post("/save", (req, res) => {
 });
 
 // คอมไพล์โค้ด
+// คอมไพล์โค้ด
 app.post("/compile", (req, res) => {
     let { code, input, lang } = req.body;
     if (!code || !lang) {
@@ -59,12 +60,37 @@ app.post("/compile", (req, res) => {
         let envData = { OS: "windows", options: { timeout: 10000 } };
 
         if (lang === "Cpp") {
-            envData.cmd = "g++";
+            envData.cmd = "g++";  // สำหรับ C++
             compiler.compileCPPWithInput(envData, code, input, (data) => res.json(data));
         } else if (lang === "Python") {
+            envData.cmd = "python";  // สำหรับ Python
             compiler.compilePythonWithInput(envData, code, input, (data) => res.json(data));
         } else if (lang === "Java") {
-            compiler.compileJavaWithInput(envData, code, input, (data) => res.json(data));
+            const filename = "Main.java";
+            const filePath = path.join(__dirname, "uploads", filename);
+
+            // บันทึกโค้ด Java ลงไฟล์
+            fs.writeFileSync(filePath, code);
+
+            // คอมไพล์ Java ด้วยคำสั่ง javac
+            const compileCmd = `javac ${filePath}`;
+            const exec = require("child_process").exec;
+
+            exec(compileCmd, (err, stdout, stderr) => {
+                if (err) {
+                    return res.status(400).json({ output: "Compilation Error: " + stderr });
+                }
+
+                // หลังจากคอมไพล์สำเร็จ ให้รันโปรแกรม Java
+                const runCmd = `java -cp ${__dirname}/uploads Main`;  // ใช้ classpath เพื่อรัน Main.class
+                exec(runCmd, (err, stdout, stderr) => {
+                    if (err) {
+                        return res.status(400).json({ output: "Runtime Error: " + stderr });
+                    }
+                    // ส่งผลลัพธ์กลับ
+                    res.json({ output: stdout });
+                });
+            });
         } else {
             res.status(400).json({ output: "Unsupported language" });
         }
@@ -72,6 +98,7 @@ app.post("/compile", (req, res) => {
         res.status(500).json({ output: "Internal server error" });
     }
 });
+
 
 // ดาวน์โหลดไฟล์
 app.get("/download/:filename", (req, res) => {
